@@ -1,0 +1,55 @@
+[plugin]
+id = "silero-tts"
+name = "Silero TTS"
+version = "0.1.0"
+description = "Local Russian text-to-speech on Silero V5. Voices: aidar, baya, kseniya, xenia, eugene. Runs offline after a one-time model download."
+author = "Lil KALINOV"
+license = "MIT"
+
+[entry]
+command = "target/release/silero_tts.exe"
+cwd = "."
+runtimes = ["python"]
+
+# `[capabilities]` is what Astra may call INTO this plugin.
+[capabilities]
+tts = true
+
+# `[permissions]` is what this plugin may call OUT to Astra. This plugin needs
+# no host calls beyond the bootstrap set, so the section stays empty.
+[permissions]
+
+[platform]
+os = ["windows", "linux"]
+arch = ["x86_64"]
+
+# Plugin settings (Settings page). The Rust side receives them via `on_config`.
+# Voice picker lives on Astra's Voice page — it comes from `tts_voices`.
+[config]
+schema = """
+{
+  "type": "object",
+  "properties": {
+    "voice": {
+      "type": "string",
+      "title": "Default voice",
+      "description": "Used when no voice is pinned on the Voice page.",
+      "enum": ["aidar", "baya", "kseniya", "xenia", "eugene"],
+      "default": "xenia"
+    },
+    "model": {
+      "type": "string",
+      "title": "Model",
+      "description": "Silero package: v5_5_ru is the latest, v4_ru is the fallback.",
+      "enum": ["v5_5_ru", "v4_ru"],
+      "default": "v5_5_ru"
+    },
+    "sample_rate": {
+      "type": "integer",
+      "title": "Sample rate (Hz)",
+      "enum": [8000, 24000, 48000],
+      "default": 24000
+    }
+  }
+}
+"""

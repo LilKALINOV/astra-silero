@@ -1,0 +1,11 @@
+[package]
+name = "silero_tts"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# The SDK re-exports tokio, serde_json, schemars and the `json!` macro, but the
+# anyhow *crate* only gives us the type — its `anyhow!` / `bail!` macros do not
+# survive the re-export, so list anyhow directly for the macros.
+astra-plugin-sdk = "0.6"
+anyhow = "1"
