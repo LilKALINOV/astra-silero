@@ -1,0 +1,31 @@
+{
+  "locales": {
+    "ru": {
+      "config.default_voice.aidar": "2ef0f66e7ee1",
+      "config.default_voice.baya": "311815b81aa9",
+      "config.default_voice.description": "92051cd34d14",
+      "config.default_voice.eugene": "bd03262b8f8c",
+      "config.default_voice.kseniya": "7a9f269285aa",
+      "config.default_voice.title": "47813ba0bdf5",
+      "config.default_voice.xenia": "b730c0fb0fac",
+      "config.model.description": "f8e68e0d3410",
+      "config.model.title": "5e2c614c23f0",
+      "config.model.v4_ru": "96ba52a35f84",
+      "config.model.v5_5_ru": "6df51c994da0",
+      "config.sample_rate.24000": "e8ee35445e69",
+      "config.sample_rate.48000": "c9241c12f282",
+      "config.sample_rate.8000": "416608d515b8",
+      "config.sample_rate.description": "c3088a864c48",
+      "config.sample_rate.title": "b50167dca07f",
+      "listing.description": "acbf296795f6",
+      "listing.name": "11bd308d7714",
+      "voice.aidar": "2ef0f66e7ee1",
+      "voice.baya": "311815b81aa9",
+      "voice.eugene": "bd03262b8f8c",
+      "voice.kseniya": "7a9f269285aa",
+      "voice.xenia": "b730c0fb0fac"
+    }
+  },
+  "schema": "astra.plugin.locales/1",
+  "source": "en"
+}

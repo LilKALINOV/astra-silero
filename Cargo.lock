@@ -84,9 +84,9 @@ dependencies = [
 
 [[package]]
 name = "astra-plugin-macros"
-version = "0.6.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "025aee681a53394fde05e5d84d66a97fd25faa161838bae6612ae7e3bdeff9e2"
+checksum = "518c6d590d54e94ab5f93fba994a33235e784181ded6d2f63cd292d5ca267812"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -95,9 +95,9 @@ dependencies = [
 
 [[package]]
 name = "astra-plugin-sdk"
-version = "0.6.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ea392baca758c08348f1e04271f14d4b7161181af5c2a551596493c6262a6a2"
+checksum = "2cca1787699142bac50801b27787372122d7d09752714bc7bb632000b245717e"
 dependencies = [
  "anyhow",
  "arc-swap",

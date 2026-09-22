@@ -7,5 +7,5 @@ edition = "2024"
 # The SDK re-exports tokio, serde_json, schemars and the `json!` macro, but the
 # anyhow *crate* only gives us the type — its `anyhow!` / `bail!` macros do not
 # survive the re-export, so list anyhow directly for the macros.
-astra-plugin-sdk = "0.6"
+astra-plugin-sdk = "0.7"
 anyhow = "1"

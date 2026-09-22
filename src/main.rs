@@ -18,12 +18,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 /// The five speakers Silero V5 ships for Russian — ids are Silero's own.
-const VOICES: &[(&str, &str, &str)] = &[
-    ("aidar", "Айдар", "male"),
-    ("baya", "Бая", "female"),
-    ("kseniya", "Ксения", "female"),
-    ("xenia", "Ксения (xenia)", "female"),
-    ("eugene", "Евгений", "male"),
+/// Display names come from `locales/` (voice.<id>) at runtime.
+const VOICES: &[(&str, &str)] = &[
+    ("aidar", "male"),
+    ("baya", "female"),
+    ("kseniya", "female"),
+    ("xenia", "female"),
+    ("eugene", "male"),
 ];
 const DEFAULT_VOICE: &str = "xenia";
 
@@ -39,7 +40,7 @@ const DEFAULT_SAMPLE_RATE: u32 = 24_000;
 #[astra::config]
 struct Settings {
     #[serde(default = "default_voice")]
-    voice: String,
+    default_voice: String,
     #[serde(default = "default_model")]
     model: String,
     #[serde(default = "default_sample_rate")]
@@ -49,7 +50,7 @@ struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            voice: default_voice(),
+            default_voice: default_voice(),
             model: default_model(),
             sample_rate: default_sample_rate(),
         }
@@ -262,7 +263,33 @@ fn temp_wav_path() -> PathBuf {
 }
 
 fn valid_voice(id: &str) -> bool {
-    VOICES.iter().any(|(v, _, _)| *v == id)
+    VOICES.iter().any(|(v, _)| *v == id)
+}
+
+/// A voice's display name in the context's language (RU/EN), with an English
+/// fallback so an incomplete locale file or a missing ambient context can never
+/// leak a raw key. Voice names are resolved in-process: the daemon only renders
+/// declared strings, and `tts_voices` receives no context argument.
+fn voice_name(id: &str) -> String {
+    let english = match id {
+        "aidar" => "Aidar",
+        "baya" => "Baya",
+        "kseniya" => "Kseniya",
+        "xenia" => "Kseniya (xenia)",
+        "eugene" => "Yevgeny",
+        _ => id,
+    };
+    match try_ctx() {
+        Some(ctx) => {
+            let key = format!("voice.{id}");
+            if ctx.i18n().has(&key) {
+                ctx.i18n().t(&key)
+            } else {
+                english.to_string()
+            }
+        }
+        None => english.to_string(),
+    }
 }
 
 fn valid_model(id: &str) -> bool {
@@ -275,8 +302,8 @@ fn valid_model(id: &str) -> bool {
 fn resolve(settings: &Settings, pinned: &str) -> SynthesisRequest {
     let voice = if valid_voice(pinned) {
         pinned.to_string()
-    } else if valid_voice(&settings.voice) {
-        settings.voice.clone()
+    } else if valid_voice(&settings.default_voice) {
+        settings.default_voice.clone()
     } else {
         DEFAULT_VOICE.into()
     };
@@ -321,14 +348,45 @@ impl SileroTts {
         *self.settings.lock().unwrap() = cfg;
     }
 
+    /// Warm the python worker at startup, fire-and-forget. torch import is
+    /// seconds, so without this the *first* synthesize would pay cold-start
+    /// inside its RPC window. A failed warmup is not fatal: the next
+    /// synthesize spawns on demand anyway.
+    #[hook]
+    async fn on_start(&self, _ctx: &PluginContext) -> anyhow::Result<()> {
+        let worker = Arc::clone(&self.worker);
+        tokio::task::spawn_blocking(move || {
+            let root = plugin_root();
+            let mut slot = worker.lock().unwrap();
+            if slot.is_none() {
+                match Worker::spawn(&root) {
+                    Ok(w) => *slot = Some(w),
+                    Err(_) => {}
+                }
+            }
+        });
+        Ok(())
+    }
+
+    /// Kill the worker so a blocking synthesis reader is unblocked and the
+    /// runtime drains before the daemon's grace expires. Best effort: if an
+    /// op currently holds the slot, leaving it alone is also fine — the
+    /// daemon kills the process group at the grace.
+    #[hook]
+    async fn on_shutdown(&self, _ctx: &PluginContext) {
+        if let Ok(mut slot) = self.worker.try_lock() {
+            *slot = None;
+        }
+    }
+
     /// The five Silero V5 Russian speakers — they appear on Astra's Voice page
     /// ("поле tts") and the user's pick comes back in `req.voice_id`.
     #[hook]
     async fn tts_voices(&self) -> Vec<VoiceInfo> {
         VOICES
             .iter()
-            .map(|(id, name, gender)| {
-                VoiceInfo::new(*id, *name)
+            .map(|(id, gender)| {
+                VoiceInfo::new(*id, voice_name(id))
                     .with_language("ru")
                     .with_gender(*gender)
             })
@@ -399,6 +457,28 @@ mod tests {
         assert_eq!(voices[0].id, "aidar");
     }
 
+    #[tokio::test]
+    async fn voice_names_follow_the_context_language() {
+        // The ambient context is process-global, so check each language while
+        // its own harness is the one installed.
+        let en = Harness::new(SileroTts::default())
+            .with_language("en")
+            .with_ambient_context()
+            .start()
+            .await
+            .expect("the plugin started (en)");
+        assert_eq!(en.tts_voices().await[0].name, "Aidar");
+
+        let ru = Harness::new(SileroTts::default())
+            .with_language("ru")
+            .with_ambient_context()
+            .start()
+            .await
+            .expect("the plugin started (ru)");
+        assert_eq!(ru.tts_voices().await[0].name, "Айдар");
+        assert_eq!(ru.tts_voices().await[4].name, "Евгений");
+    }
+
     #[test]
     fn resolution_prefers_pinned_then_defaults_then_builtins() {
         let cfg = Settings::default();
@@ -408,7 +488,7 @@ mod tests {
         assert_eq!(r.sample_rate, 24_000);
 
         let cfg = Settings {
-            voice: "baya".into(),
+            default_voice: "baya".into(),
             model: "v4_ru".into(),
             sample_rate: 48_000,
         };
@@ -421,7 +501,7 @@ mod tests {
         assert_eq!(r.voice, "eugene");
 
         let cfg = Settings {
-            voice: "nope".into(),
+            default_voice: "nope".into(),
             model: "nope".into(),
             sample_rate: 123,
         };
@@ -435,7 +515,7 @@ mod tests {
     async fn a_config_payload_arrives_and_keeps_the_plugin_healthy() {
         let h = Harness::new(SileroTts::default())
             .with_config(json!({
-                "voice": "aidar",
+                "default_voice": "aidar",
                 "model": "v4_ru",
                 "sample_rate": 8000
             }))
